@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+downloads/
+redeploy.sh
+push_to_dockerhub.sh
