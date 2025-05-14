@@ -41,6 +41,7 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"]
 )
 
+'''
 # Log all requests
 @app.before_request
 def log_request_info():
@@ -57,7 +58,7 @@ def log_request_info():
     logger.info('CF-Connecting-IP: %s', request.headers.get('CF-Connecting-IP'))
     logger.info('CF-Ray: %s', request.headers.get('CF-Ray'))
     logger.info('CDN-Loop: %s', request.headers.get('CDN-Loop'))
-
+'''
 DOWNLOADS_DIR = os.path.abspath('downloads')
 if not os.path.exists(DOWNLOADS_DIR):
     os.makedirs(DOWNLOADS_DIR)
@@ -69,13 +70,14 @@ if not MAGIC_PASSWORD:
 @app.route('/', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
 def index():
-    logger.info('Accessing index page')
     if request.method == 'POST':
         if request.form.get('password') == MAGIC_PASSWORD:
             session['unlocked'] = True
+    
     unlocked = session.get('unlocked', False)
     video_files = []
     now = time.time()
+    
     for fname in os.listdir(DOWNLOADS_DIR):
         if fname.lower().endswith((
             '.mp4', '.mkv', '.webm', '.flv', '.avi', '.mov', '.wmv', '.m4a',
@@ -89,15 +91,16 @@ def index():
                 size_str = f"{size_bytes / (1024**2):.2f} MB"
             mtime = os.path.getmtime(fpath)
             dt_str = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-            # Debug print for verification
-            print(f"{fname}: mtime={mtime}, now={now}, diff={now-mtime}, unlocked={unlocked}")
+
             if unlocked:
                 video_files.append((dt_str, fname, size_str))
             else:
                 if now - mtime <= 300:
                     video_files.append((dt_str, fname, size_str))
+
     def get_mtime(video_tuple):
         return os.path.getmtime(os.path.join(DOWNLOADS_DIR, video_tuple[1]))
+    
     video_files.sort(key=get_mtime, reverse=True)
     return render_template('index.html', video_files=video_files, unlocked=unlocked)
 
@@ -171,17 +174,9 @@ def stream():
             match = re.search(r'\[download\] Destination: (.+)', line)
             if match:
                 downloaded_file = match.group(1)
-                # Remove the file if it already exists
-                if os.path.isfile(downloaded_file):
-                    try:
-                        os.remove(downloaded_file)
-                        logger.info(f'Removed existing file before download: {downloaded_file}')
-                        yield f'data: Removed existing file before download: {downloaded_file}\n\n'
-                    except Exception as e:
-                        logger.error(f'Error removing file {downloaded_file}: {e}')
-                        yield f'data: Error removing file {downloaded_file}: {e}\n\n'
         process.stdout.close()
         process.wait()
+        
         # After download, update the file's mtime to now
         if downloaded_file and os.path.isfile(downloaded_file):
             now = time.time()
@@ -217,7 +212,7 @@ def debug_headers():
 
 @app.after_request
 def log_response_info(response):
-    logger.info('Response Headers: %s', dict(response.headers))
+    logger.debug('Response Headers: %s', dict(response.headers))
     return response
 
 @app.route('/lock')
