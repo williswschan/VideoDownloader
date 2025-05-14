@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_from_directory, redirect, url_for, abort, Response, stream_with_context
+from flask import Flask, render_template, request, send_from_directory, redirect, url_for, abort, Response, stream_with_context, session
 import os
 import subprocess
 import secrets
@@ -53,14 +53,22 @@ DOWNLOADS_DIR = os.path.abspath('downloads')
 if not os.path.exists(DOWNLOADS_DIR):
     os.makedirs(DOWNLOADS_DIR)
 
+MAGIC_PASSWORD = os.environ.get('MAGIC_PASSWORD')
+if not MAGIC_PASSWORD: 
+    MAGIC_PASSWORD = 'PASSWORD'
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     logger.info('Accessing index page')
+    if request.method == 'POST':
+        if request.form.get('password') == MAGIC_PASSWORD:
+            session['unlocked'] = True
+    unlocked = session.get('unlocked', False)
     video_files = []
-    
+    now = time.time()
     for fname in os.listdir(DOWNLOADS_DIR):
         if fname.lower().endswith((
-            '.mp4', '.mkv', '.webm', '.flv', '.avi', '.mov', '.wmv', '.m4a',  # video/audio
+            '.mp4', '.mkv', '.webm', '.flv', '.avi', '.mov', '.wmv', '.m4a',
             '.mp3', '.aac', '.wav', '.ogg', '.opus', '.flac', '.alac', '.aiff', '.wma', '.amr', '.ac3', '.dsd', '.pcm'
         )):
             fpath = os.path.join(DOWNLOADS_DIR, fname)
@@ -71,13 +79,17 @@ def index():
                 size_str = f"{size_bytes / (1024**2):.2f} MB"
             mtime = os.path.getmtime(fpath)
             dt_str = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-            video_files.append((dt_str, fname, size_str))
-    
+            # Debug print for verification
+            print(f"{fname}: mtime={mtime}, now={now}, diff={now-mtime}, unlocked={unlocked}")
+            if unlocked:
+                video_files.append((dt_str, fname, size_str))
+            else:
+                if now - mtime <= 300:
+                    video_files.append((dt_str, fname, size_str))
     def get_mtime(video_tuple):
         return os.path.getmtime(os.path.join(DOWNLOADS_DIR, video_tuple[1]))
     video_files.sort(key=get_mtime, reverse=True)
-
-    return render_template('index.html', video_files=video_files)
+    return render_template('index.html', video_files=video_files, unlocked=unlocked)
 
 @app.route('/downloads/<path:filename>')
 def download_file(filename):
@@ -127,6 +139,10 @@ def stream():
     else:
         ytdlp_path = './yt-dlp-youtube'
     output_template = os.path.join(DOWNLOADS_DIR, '%(title)s.%(ext)s')
+
+    # Check for existing file with the same name and remove it before download
+    # We can't know the exact filename until yt-dlp runs, but we can check after parsing the destination line
+
     cmd = [
         ytdlp_path,
         '-o', output_template,
@@ -137,17 +153,29 @@ def stream():
 
     def generate():
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        downloaded_file = None
         for line in iter(process.stdout.readline, ''):
             logger.info('yt-dlp output: %s', line.rstrip())
             yield f'data: {line.rstrip()}\n\n'
+            # Look for the destination line
+            match = re.search(r'\[download\] Destination: (.+)', line)
+            if match:
+                downloaded_file = match.group(1)
+                # Remove the file if it already exists
+                if os.path.isfile(downloaded_file):
+                    try:
+                        os.remove(downloaded_file)
+                        logger.info(f'Removed existing file before download: {downloaded_file}')
+                        yield f'data: Removed existing file before download: {downloaded_file}\n\n'
+                    except Exception as e:
+                        logger.error(f'Error removing file {downloaded_file}: {e}')
+                        yield f'data: Error removing file {downloaded_file}: {e}\n\n'
         process.stdout.close()
         process.wait()
         # After download, update the file's mtime to now
-        files = glob.glob(os.path.join(DOWNLOADS_DIR, '*'))
-        if files:
-            latest_file = max(files, key=os.path.getmtime)
+        if downloaded_file and os.path.isfile(downloaded_file):
             now = time.time()
-            os.utime(latest_file, (now, now))
+            os.utime(downloaded_file, (now, now))
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
@@ -181,6 +209,11 @@ def debug_headers():
 def log_response_info(response):
     logger.info('Response Headers: %s', dict(response.headers))
     return response
+
+@app.route('/lock')
+def lock():
+    session.pop('unlocked', None)
+    return redirect(url_for('index'))
 
 # --------------------------- Main ---------------------------
 

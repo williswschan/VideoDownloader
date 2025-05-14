@@ -205,6 +205,16 @@
         </div>
         <div class="downloads-list">
             <h3>Downloaded Videos</h3>
+            {% if not unlocked %}
+            <form method="POST" style="margin-bottom: 18px;">
+                <input type="password" name="password" placeholder="PASSWORD" required>
+                <button type="submit">Unlock</button>
+            </form>
+            {% else %}
+            <form action="{{ url_for('lock') }}" method="get" style="margin-bottom: 18px;">
+                <button type="submit">Lock</button>
+            </form>
+            {% endif %}
             {% if video_files %}
             <div style="overflow-x:auto;">
             <table style="width:100%; border-collapse:collapse;">
