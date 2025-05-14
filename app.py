@@ -8,6 +8,8 @@ import time
 import re
 from werkzeug.middleware.proxy_fix import ProxyFix
 import logging
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Configure logging
 logging.basicConfig(
@@ -31,6 +33,13 @@ app.wsgi_app = ProxyFix(
 
 # Set the application root URL if behind a proxy
 app.config['APPLICATION_ROOT'] = os.environ.get('APPLICATION_ROOT', '/')
+
+# Add Flask-Limiter for rate limiting
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"]
+)
 
 # Log all requests
 @app.before_request
@@ -58,6 +67,7 @@ if not MAGIC_PASSWORD:
     MAGIC_PASSWORD = 'PASSWORD'
 
 @app.route('/', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def index():
     logger.info('Accessing index page')
     if request.method == 'POST':
