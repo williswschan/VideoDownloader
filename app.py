@@ -73,6 +73,7 @@ def index():
     if request.method == 'POST':
         if request.form.get('password') == MAGIC_PASSWORD:
             session['unlocked'] = True
+            logger.info('Unlock: User session unlocked via password')
     
     unlocked = session.get('unlocked', False)
     video_files = []
@@ -218,6 +219,7 @@ def log_response_info(response):
 @app.route('/lock')
 def lock():
     session.pop('unlocked', None)
+    logger.info('Lock: User session has been locked')
     return redirect(url_for('index'))
 
 # --------------------------- Main ---------------------------
