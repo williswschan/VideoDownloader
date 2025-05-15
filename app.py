@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or secrets.token_hex(32)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = True  # Only if using HTTPS
 
 # Configure ProxyFix with all possible headers
 app.wsgi_app = ProxyFix(
@@ -68,7 +70,7 @@ if not MAGIC_PASSWORD:
     MAGIC_PASSWORD = 'PASSWORD'
 
 @app.route('/', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("5 per minute", methods=["POST"])
 def index():
     if request.method == 'POST':
         if request.form.get('password') == MAGIC_PASSWORD:
@@ -125,7 +127,7 @@ def remove_file(filename):
         if os.path.exists(file_path):
             os.remove(file_path)
     except Exception as e:
-        pass
+        logger.error(f"Error removing file: {e}")
     return redirect(url_for('index'))
 
 @app.route('/stream')
@@ -153,15 +155,12 @@ def stream():
     else:
         ytdlp_path = './yt-dlp-youtube'
     output_template = os.path.join(DOWNLOADS_DIR, '%(title)s.%(ext)s')
-
-    # Check for existing file with the same name and remove it before download
-    # We can't know the exact filename until yt-dlp runs, but we can check after parsing the destination line
-
     cmd = [
         ytdlp_path,
         '-o', output_template,
         '--no-check-certificate',
         '--ignore-errors',
+        '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
         url
     ]
 
@@ -177,11 +176,25 @@ def stream():
                 downloaded_file = match.group(1)
         process.stdout.close()
         process.wait()
-        
         # After download, update the file's mtime to now
         if downloaded_file and os.path.isfile(downloaded_file):
             now = time.time()
             os.utime(downloaded_file, (now, now))
+            # If the file is .webm, convert to .mp4
+            if downloaded_file.endswith('.webm'):
+                mp4_file = downloaded_file[:-5] + '.mp4'
+                ffmpeg_cmd = ['ffmpeg', '-y', '-i', downloaded_file, '-c:v', 'libx264', '-c:a', 'aac', mp4_file]
+                logger.info(f'Converting {downloaded_file} to {mp4_file} using ffmpeg')
+                result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+                if result.returncode == 0:
+                    logger.info(f'Conversion complete: {mp4_file}')
+                    os.utime(mp4_file, (now, now))
+                    yield f'data: Conversion to mp4 complete.\n\n'
+                    # Signal the client to refresh the page
+                    yield 'event: refresh\ndata: refresh\n\n'
+                else:
+                    logger.error(f'ffmpeg conversion failed: {result.stderr}')
+                    yield f'data: Conversion to mp4 failed.\n\n'
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
