@@ -173,7 +173,7 @@ def stream():
                 '-o', output_template,
                 '--no-check-certificate',
                 '--ignore-errors',
-                '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
+                '-f', 'bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/mp4',
                 url
             ]
             
