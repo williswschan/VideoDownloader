@@ -14,7 +14,7 @@ VideoDownloader is a Python-based application designed to help users download vi
 - `app.py` — Main application logic (likely includes the web server and download logic)
 - `requirements.txt` — Python dependencies
 - `Dockerfile` — Containerization instructions
-- `bin/` — (Purpose not specified, likely for binaries or helper scripts)
+- `bin/` — Binaries
 - `templates/` — HTML templates for the web interface
 - `push_to_registry.sh` — Script to push Docker images to a registry
 - `redeploy.sh` — Script to redeploy the application
