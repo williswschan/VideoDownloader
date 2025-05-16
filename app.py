@@ -67,10 +67,6 @@ def index():
         if request.form.get('password') == MAGIC_PASSWORD:
             session['admin_mode'] = True
             session.modified = True
-            logger.info('Admin Mode: User session enabled via password')
-    
-    # Debug log for session state
-    logger.info(f"Session admin_mode state: {session.get('admin_mode', False)}")
     
     admin_mode = session.get('admin_mode', False)
     video_files = []
@@ -159,7 +155,7 @@ def stream():
             if 'douyin' in url:
                 ytdlp_path = 'bin/yt-dlp-douyin'
             else:
-                ytdlp_path = 'bin/yt-dlp-youtube'
+                ytdlp_path = 'bin/yt-dlp'
             
             output_template = os.path.join(DOWNLOADS_DIR, '%(title)s.%(ext)s')
             cmd = [

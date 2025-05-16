@@ -5,13 +5,17 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y wget ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y wget ffmpeg curl && rm -rf /var/lib/apt/lists/*
 
 # Copy app code
 COPY . .
 
-# Ensure yt-dlp binaries are executable
-RUN chmod +x bin/yt-dlp-douyin bin/yt-dlp-youtube
+# Download the latest official yt-dlp
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o bin/yt-dlp && \
+    chmod +x bin/yt-dlp
+
+# Ensure yt-dlp-douyin is executable
+RUN chmod +x bin/yt-dlp*
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt \
@@ -27,4 +31,4 @@ RUN rm -rf __pycache__
 EXPOSE 5000
 
 # Run the app
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app", "--access-logfile", "-"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app", "--access-logfile", "-", "--timeout", "600"]
