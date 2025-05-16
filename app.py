@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, send_from_directory, redirect
 import os
 import subprocess
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 import glob
 import time
 import re
@@ -22,6 +22,10 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY') or secrets.token_hex(32)
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = True  # Only if using HTTPS
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)  # Session lasts for 1 day
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_NAME'] = 'video_downloader_session'
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Refresh session on each request
 
 # Configure ProxyFix with all possible headers
 app.wsgi_app = ProxyFix(
@@ -43,24 +47,6 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"]
 )
 
-'''
-# Log all requests
-@app.before_request
-def log_request_info():
-    logger.info('Request: %s %s', request.method, request.url)
-    logger.info('Full URL: %s', request.url)
-    logger.info('Base URL: %s', request.base_url)
-    logger.info('Host URL: %s', request.host_url)
-    logger.info('Headers: %s', dict(request.headers))
-    logger.info('X-Forwarded-For: %s', request.headers.get('X-Forwarded-For'))
-    logger.info('X-Forwarded-Proto: %s', request.headers.get('X-Forwarded-Proto'))
-    logger.info('X-Forwarded-Host: %s', request.headers.get('X-Forwarded-Host'))
-    logger.info('Host: %s', request.headers.get('Host'))
-    logger.info('Referer: %s', request.headers.get('Referer'))
-    logger.info('CF-Connecting-IP: %s', request.headers.get('CF-Connecting-IP'))
-    logger.info('CF-Ray: %s', request.headers.get('CF-Ray'))
-    logger.info('CDN-Loop: %s', request.headers.get('CDN-Loop'))
-'''
 DOWNLOADS_DIR = os.path.abspath('downloads')
 if not os.path.exists(DOWNLOADS_DIR):
     os.makedirs(DOWNLOADS_DIR)
@@ -69,15 +55,24 @@ MAGIC_PASSWORD = os.environ.get('MAGIC_PASSWORD')
 if not MAGIC_PASSWORD: 
     MAGIC_PASSWORD = 'PASSWORD'
 
+@app.before_request
+def before_request():
+    # Make session permanent for all requests
+    session.permanent = True
+
 @app.route('/', methods=['GET', 'POST'])
 @limiter.limit("5 per minute", methods=["POST"])
 def index():
     if request.method == 'POST':
         if request.form.get('password') == MAGIC_PASSWORD:
-            session['unlocked'] = True
-            logger.info('Unlock: User session unlocked via password')
+            session['admin_mode'] = True
+            session.modified = True
+            logger.info('Admin Mode: User session enabled via password')
     
-    unlocked = session.get('unlocked', False)
+    # Debug log for session state
+    logger.info(f"Session admin_mode state: {session.get('admin_mode', False)}")
+    
+    admin_mode = session.get('admin_mode', False)
     video_files = []
     now = time.time()
     
@@ -95,7 +90,7 @@ def index():
             mtime = os.path.getmtime(fpath)
             dt_str = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
 
-            if unlocked:
+            if admin_mode:
                 video_files.append((dt_str, fname, size_str))
             else:
                 if now - mtime <= 300:
@@ -105,7 +100,7 @@ def index():
         return os.path.getmtime(os.path.join(DOWNLOADS_DIR, video_tuple[1]))
     
     video_files.sort(key=get_mtime, reverse=True)
-    return render_template('index.html', video_files=video_files, unlocked=unlocked)
+    return render_template('index.html', video_files=video_files, admin_mode=admin_mode)
 
 @app.route('/downloads/<path:filename>')
 def download_file(filename):
@@ -126,8 +121,16 @@ def remove_file(filename):
     try:
         if os.path.exists(file_path):
             os.remove(file_path)
+            logger.info(f"File removed: {filename}")
     except Exception as e:
         logger.error(f"Error removing file: {e}")
+    
+    # Set admin mode based on form submission
+    if request.form.get('admin_mode') == 'true':
+        session['admin_mode'] = True
+        session.modified = True
+        logger.info("Admin Mode: State preserved after file removal")
+    
     return redirect(url_for('index'))
 
 @app.route('/download', methods=['POST'])
@@ -230,8 +233,8 @@ def log_response_info(response):
 
 @app.route('/lock')
 def lock():
-    session.pop('unlocked', None)
-    logger.info('Lock: User session has been locked')
+    session.pop('admin_mode', None)
+    logger.info('Admin Mode: User session has been disabled')
     return redirect(url_for('index'))
 
 # --------------------------- Main ---------------------------
