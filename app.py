@@ -173,24 +173,31 @@ def stream():
             
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
             downloaded_file = None
+            merged_file = None
             
             for line in iter(process.stdout.readline, ''):
                 line = line.rstrip()
                 logger.info('yt-dlp output: %s', line)
                 yield f"data: {line}\n\n"
-                
                 # Look for the destination line
                 match = re.search(r'\[download\] Destination: (.+)', line)
                 if match:
                     downloaded_file = match.group(1)
+                # Look for the merger line
+                match_merge = re.search(r'\[Merger\] Merging formats into "(.+)"', line)
+                if match_merge:
+                    merged_file = match_merge.group(1)
             
             process.stdout.close()
             process.wait()
             
-            if downloaded_file and os.path.isfile(downloaded_file):
+            # Set mtime on the merged file if it exists, else on the downloaded file
+            target_file = merged_file if merged_file and os.path.isfile(merged_file) else downloaded_file
+            if target_file and os.path.isfile(target_file):
                 now = time.time()
-                os.utime(downloaded_file, (now, now))
-                yield f"data: Download completed: {os.path.basename(downloaded_file)}\n\n"
+                os.utime(target_file, (now, now))
+                logger.info(f"Set mtime for {target_file} to now after download/merge.")
+                yield f"data: Download completed: {os.path.basename(target_file)}\n\n"
             else:
                 yield "data: Download failed\n\n"
                 
