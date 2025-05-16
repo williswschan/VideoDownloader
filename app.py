@@ -61,7 +61,7 @@ def before_request():
     session.permanent = True
 
 @app.route('/', methods=['GET', 'POST'])
-@limiter.limit("5 per minute", methods=["POST"])
+@limiter.limit("5 per 30 seconds", methods=["POST"])
 def index():
     if request.method == 'POST':
         if request.form.get('password') == MAGIC_PASSWORD:
@@ -236,6 +236,10 @@ def lock():
     session.pop('admin_mode', None)
     logger.info('Admin Mode: User session has been disabled')
     return redirect(url_for('index'))
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return render_template("429.html", error=e), 429
 
 # --------------------------- Main ---------------------------
 
