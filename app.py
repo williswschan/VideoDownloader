@@ -145,9 +145,19 @@ def download():
 
 @app.route('/stream')
 def stream():
-    url = request.args.get('url')
-    if not url:
+    raw_url = request.args.get('url')
+    if not raw_url:
         return "No URL provided", 400
+
+    # Extract the first valid URL from the input string
+    match = re.search(r'https?://[^\s]+', raw_url)
+    url = match.group(0) if match else None
+
+    if not url:
+        logger.warning('No valid URL found in input: %s', raw_url)
+        def error_gen():
+            yield 'data: No valid URL found in input\n\n'
+        return Response(error_gen(), mimetype='text/event-stream')
 
     def generate():
         try:
@@ -180,7 +190,7 @@ def stream():
                 if match:
                     downloaded_file = match.group(1)
                 # Look for the merger line
-                match_merge = re.search(r'\[Merger\] Merging formats into "(.+)"', line)
+                match_merge = re.search(r'\[Merger\] Merging formats into \"(.+)\"', line)
                 if match_merge:
                     merged_file = match_merge.group(1)
             
