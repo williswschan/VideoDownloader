@@ -157,9 +157,9 @@ def stream():
         try:
             logger.info('Starting download for URL: %s', url)
             if 'douyin' in url:
-                ytdlp_path = './yt-dlp-douyin'
+                ytdlp_path = 'bin/yt-dlp-douyin'
             else:
-                ytdlp_path = './yt-dlp-youtube'
+                ytdlp_path = 'bin/yt-dlp-youtube'
             
             output_template = os.path.join(DOWNLOADS_DIR, '%(title)s.%(ext)s')
             cmd = [

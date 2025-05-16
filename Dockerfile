@@ -10,12 +10,18 @@ RUN apt-get update && apt-get install -y wget ffmpeg && rm -rf /var/lib/apt/list
 # Copy app code
 COPY . .
 
+# Ensure yt-dlp binaries are executable
+RUN chmod +x bin/yt-dlp-douyin bin/yt-dlp-youtube
+
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt \
     && rm requirements.txt
 
 # Create downloads directory
 RUN mkdir -p /app/downloads
+
+# Remove __pycache__ directory
+RUN rm -rf __pycache__
 
 # Expose port
 EXPOSE 5000
