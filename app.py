@@ -130,71 +130,70 @@ def remove_file(filename):
         logger.error(f"Error removing file: {e}")
     return redirect(url_for('index'))
 
+@app.route('/download', methods=['POST'])
+def download():
+    url = request.form.get('url')
+    if not url:
+        return redirect(url_for('index'))
+    
+    # Clean and encode the URL
+    url = url.strip()
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+    
+    # Start the download process
+    return redirect(url_for('stream', url=url))
+
 @app.route('/stream')
 def stream():
-    raw_url = request.args.get('url')
-    if not raw_url:
-        logger.warning('No URL provided in stream request')
-        def error_gen():
-            yield 'data: No URL provided\n\n'
-        return Response(error_gen(), mimetype='text/event-stream')
-
-    # Extract the first URL from the input string
-    match = re.search(r'https?://[^\s]+', raw_url)
-    url = match.group(0) if match else None
-
+    url = request.args.get('url')
     if not url:
-        logger.warning('No valid URL found in input: %s', raw_url)
-        def error_gen():
-            yield 'data: No valid URL found in input\n\n'
-        return Response(error_gen(), mimetype='text/event-stream')
-
-    logger.info('Starting download for URL: %s', url)
-    if 'douyin' in url:
-        ytdlp_path = './yt-dlp-douyin'
-    else:
-        ytdlp_path = './yt-dlp-youtube'
-    output_template = os.path.join(DOWNLOADS_DIR, '%(title)s.%(ext)s')
-    cmd = [
-        ytdlp_path,
-        '-o', output_template,
-        '--no-check-certificate',
-        '--ignore-errors',
-        '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
-        url
-    ]
+        return "No URL provided", 400
 
     def generate():
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        downloaded_file = None
-        for line in iter(process.stdout.readline, ''):
-            logger.info('yt-dlp output: %s', line.rstrip())
-            yield f'data: {line.rstrip()}\n\n'
-            # Look for the destination line
-            match = re.search(r'\[download\] Destination: (.+)', line)
-            if match:
-                downloaded_file = match.group(1)
-        process.stdout.close()
-        process.wait()
-        # After download, update the file's mtime to now
-        if downloaded_file and os.path.isfile(downloaded_file):
-            now = time.time()
-            os.utime(downloaded_file, (now, now))
-            # If the file is .webm, convert to .mp4
-            if downloaded_file.endswith('.webm'):
-                mp4_file = downloaded_file[:-5] + '.mp4'
-                ffmpeg_cmd = ['ffmpeg', '-y', '-i', downloaded_file, '-c:v', 'libx264', '-c:a', 'aac', mp4_file]
-                logger.info(f'Converting {downloaded_file} to {mp4_file} using ffmpeg')
-                result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
-                if result.returncode == 0:
-                    logger.info(f'Conversion complete: {mp4_file}')
-                    os.utime(mp4_file, (now, now))
-                    yield f'data: Conversion to mp4 complete.\n\n'
-                    # Signal the client to refresh the page
-                    yield 'event: refresh\ndata: refresh\n\n'
-                else:
-                    logger.error(f'ffmpeg conversion failed: {result.stderr}')
-                    yield f'data: Conversion to mp4 failed.\n\n'
+        try:
+            logger.info('Starting download for URL: %s', url)
+            if 'douyin' in url:
+                ytdlp_path = './yt-dlp-douyin'
+            else:
+                ytdlp_path = './yt-dlp-youtube'
+            
+            output_template = os.path.join(DOWNLOADS_DIR, '%(title)s.%(ext)s')
+            cmd = [
+                ytdlp_path,
+                '-o', output_template,
+                '--no-check-certificate',
+                '--ignore-errors',
+                '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4',
+                url
+            ]
+            
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+            downloaded_file = None
+            
+            for line in iter(process.stdout.readline, ''):
+                line = line.rstrip()
+                logger.info('yt-dlp output: %s', line)
+                yield f"data: {line}\n\n"
+                
+                # Look for the destination line
+                match = re.search(r'\[download\] Destination: (.+)', line)
+                if match:
+                    downloaded_file = match.group(1)
+            
+            process.stdout.close()
+            process.wait()
+            
+            if downloaded_file and os.path.isfile(downloaded_file):
+                now = time.time()
+                os.utime(downloaded_file, (now, now))
+                yield f"data: Download completed: {os.path.basename(downloaded_file)}\n\n"
+            else:
+                yield "data: Download failed\n\n"
+                
+        except Exception as e:
+            logger.error(f"Error in stream: {str(e)}")
+            yield f"data: Error: {str(e)}\n\n"
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
 

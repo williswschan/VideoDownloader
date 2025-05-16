@@ -193,7 +193,7 @@
 <body>
     <div class="container">
         <h1>Video Downloader</h1>
-        <form id="download-form" method="GET" action="#">
+        <form id="download-form" method="POST" action="{{ url_for('download') }}">
             <div class="form-group">
                 <input type="text" name="url" id="video-url" placeholder="Enter video URL here..." required autocomplete="off">
             </div>
@@ -269,10 +269,17 @@
         form.onsubmit = function(e) {
             e.preventDefault();
             const url = document.getElementById('video-url').value;
+            if (!url) return;  // Don't proceed if URL is empty
+            
             logContent.innerHTML = '';
             if (eventSource) {
                 eventSource.close();
             }
+            
+            // Clear the URL field after getting its value
+            document.getElementById('video-url').value = '';
+            
+            // Start the download process
             eventSource = new EventSource(`/stream?url=${encodeURIComponent(url)}`);
             eventSource.onmessage = function(event) {
                 logContent.innerHTML += event.data + '<br>';
@@ -284,7 +291,10 @@
                 eventSource.close();
                 // Save log to localStorage before reload
                 localStorage.setItem('statusLog', logContent.innerHTML);
-                location.reload(); // Reload page to update Downloaded Videos
+                // Add a small delay before reload to ensure localStorage is saved
+                setTimeout(() => {
+                    location.reload(); // Reload page to update Downloaded Videos
+                }, 100);
             };
         };
     </script>
