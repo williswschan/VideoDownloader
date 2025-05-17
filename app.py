@@ -254,6 +254,11 @@ def lock():
 def ratelimit_handler(e):
     return render_template("429.html", error=e), 429
 
+@app.route('/health')
+@limiter.exempt
+def health():
+    return "OK", 200
+
 # --------------------------- Main ---------------------------
 
 if __name__ == '__main__':
