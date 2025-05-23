@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: videodownloader-deployment
+  namespace: videodownloader
+spec:
+  selector:
+    matchLabels:
+      app: videodownloader
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: videodownloader
+    spec:
+      volumes:
+      - name: videodownloader-data
+        persistentVolumeClaim:
+          claimName: videodownloader-pvc
+      containers:
+      - name: videodownloader
+#        image: williswschan/videodownloader:latest
+        image: registry.mymsngroup.com/videodownloader:latest
+#        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
+        env:
+        - name: TZ
+          value: "Asia/Hong_Kong"
+        - name: FLASK_DEBUG
+          value: "0"
+        - name: MAGIC_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: videodownloader-secret
+              key: MAGIC_PASSWORD
+        ports:
+        - containerPort: 5000 
+          protocol: TCP
+        volumeMounts:
+          - name: videodownloader-data
+            mountPath: /app/downloads
+            subPath: downloads

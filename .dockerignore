@@ -1,0 +1,6 @@
+__pycache__/
+downloads/
+redeploy.sh
+push_to_registry.sh
+.*
+Dockerfile

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Downloader</title>
+    <link href="https://fonts.googleapis.com/css?family=Inter:400,600&display=swap" rel="stylesheet">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ef 100%);
+            font-family: 'Inter', Arial, sans-serif;
+            font-size: 0.95em;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 6px 32px rgba(0,0,0,0.10), 0 1.5px 4px rgba(0,0,0,0.04);
+            padding: 32px 32px 18px 32px;
+            margin-top: 40px;
+            width: 100%;
+            max-width: 700px;
+        }
+        h1 {
+            font-size: 2.1em;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #22223b;
+        }
+        .form-group { margin-bottom: 18px; }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1.5px solid #d1d5db;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1em;
+            transition: border 0.2s;
+        }
+        input[type="text"]:focus {
+            border-color: #4f8cff;
+            outline: none;
+        }
+        button {
+            background-color: #4f8cff;
+            color: white;
+            padding: 10px 22px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, box-shadow 0.2s;
+            box-shadow: 0 2px 8px rgba(79,140,255,0.08);
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+        /* Progress bar styling */
+        progress#progress-bar::-webkit-progress-bar {
+            background-color: #eee;
+        }
+        progress#progress-bar::-webkit-progress-value {
+            background-color: #22c55e;
+        }
+        progress#progress-bar::-moz-progress-bar {
+            background-color: #22c55e;
+        }
+        progress#progress-bar {
+            accent-color: #22c55e;
+        }
+        .message {
+            margin-top: 18px;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.98em;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .downloads-list {
+            margin-top: 28px;
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 14px 12px 6px 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+        }
+        .downloads-list h3 {
+            margin-top: 0;
+            font-size: 1.2em;
+            color: #22223b;
+        }
+        .downloads-list ul { list-style: none; padding: 0; }
+        .downloads-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.98em;
+        }
+        .downloads-list a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 500;
+            word-break: break-all;
+        }
+        .downloads-list a:hover { text-decoration: underline; }
+        .remove-btn {
+            background: #dc3545;
+            color: #fff;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.92em;
+            font-weight: 500;
+            margin-left: 8px;
+            transition: background 0.2s;
+        }
+        .remove-btn:hover { background: #b91c1c; }
+        .status-window {
+            margin-top: 22px;
+            background: #181c24;
+            color: #fff;
+            padding: 12px 12px 6px 12px;
+            border-radius: 8px;
+            font-family: 'Fira Mono', 'Consolas', monospace;
+            max-height: 260px;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+        }
+        .status-window h3 {
+            margin-top: 0;
+            color: #fff;
+            display: inline-block;
+            font-size: 1em;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .clear-logs-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.92em;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .clear-logs-btn:hover { background: #c82333; }
+        .log-entry {
+            margin: 2px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.92em;
+        }
+        .log-entry.error { color: #ff6b6b; }
+        .log-entry.warning { color: #ffd93d; }
+        .log-entry.info { color: #6bff6b; }
+        #log-cleared-message {
+            color: #6bff6b;
+            margin-bottom: 8px;
+            font-size: 0.92em;
+        }
+        footer {
+            text-align: center;
+            margin-top: 36px;
+            color: #b0b3b8;
+            font-size: 0.92em;
+            letter-spacing: 1px;
+        }
+        @media (max-width: 800px) {
+            .container { padding: 12px 2vw 8px 2vw; margin-top: 10px; }
+            .downloads-list { padding: 8px 2vw 4px 2vw; }
+            .status-window { padding: 8px 2vw 4px 2vw; }
+            h1 { font-size: 1.4em; }
+            .downloads-list h3, .status-window h3 { font-size: 1em; }
+            table { font-size: 0.92em; }
+            th, td { padding: 6px 2px !important; }
+            button, .remove-btn, .clear-logs-btn { font-size: 0.95em; padding: 8px 12px; }
+            input[type="text"] { font-size: 0.98em; padding: 8px; }
+        }
+        @media (max-width: 500px) {
+            .container { padding: 4px 1vw 4px 1vw; margin-top: 2px; }
+            .downloads-list, .status-window { padding: 4px 1vw 2px 1vw; }
+            h1 { font-size: 1.1em; }
+            .downloads-list h3, .status-window h3 { font-size: 0.95em; }
+            table { font-size: 0.88em; }
+            th, td { padding: 4px 1px !important; }
+            button, .remove-btn, .clear-logs-btn { font-size: 0.92em; padding: 6px 8px; }
+            input[type="text"] { font-size: 0.95em; padding: 6px; }
+        }
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: #6c757d;
+            font-size: 0.98em;
+            letter-spacing: 1px;
+        }
+        .footer-brand-name {
+            color: #2563eb;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+        .footer-brand a:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Video Downloader</h1>
+        <form id="download-form" method="POST" action="#">
+            <div class="form-group">
+                <input type="text" name="url" id="video-url" placeholder="Enter video URL here..." required autocomplete="off">
+            </div>
+            <button type="submit">Download Video</button>
+        </form>
+        <progress id="progress-bar" value="0" max="100" style="width:100%; height: 18px; margin-bottom: 10px; display: none;"></progress>
+        <div class="status-window">
+            <h3>Live Output</h3>
+            <div id="log-content"></div>
+        </div>
+        <div class="downloads-list">
+            <h3>Downloaded Videos</h3>
+            {% if not admin_mode %}
+            <form method="POST" style="margin-bottom: 18px; display: flex; gap: 12px; align-items: center;">
+                <input type="password" name="password" placeholder="PASSWORD" required style="margin-right: 12px;">
+                <button type="submit">Admin Mode</button>
+            </form>
+            {% else %}
+            <form action="{{ url_for('lock') }}" method="get" style="margin-bottom: 18px;">
+                <button type="submit">User Mode</button>
+            </form>
+            {% endif %}
+            {% if video_files %}
+            <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr style="background:#f1f3f7;">
+                        <th style="text-align:left; padding:8px 6px; font-weight:600; color:#222; width:170px;">Datetime</th>
+                        <th style="text-align:left; padding:8px 6px; font-weight:600; color:#222;">Filename</th>
+                        <th style="text-align:right; padding:8px 6px; font-weight:600; color:#222; width:90px;">Size</th>
+                        <th style="text-align:center; padding:8px 6px; font-weight:600; color:#222; width:90px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for dt_str, fname, fsize in video_files %}
+                    <tr style="border-top:1px solid #ececec;">
+                        <td style="padding:8px 6px; color:#888; font-size:0.98em;">{{ dt_str }}</td>
+                        <td style="padding:8px 6px; word-break:break-all;">
+                            <a href="/downloads/{{ fname|urlencode }}" download>{{ fname }}</a>
+                        </td>
+                        <td style="padding:8px 6px; text-align:right; color:#888; font-size:0.98em;">{{ fsize }}</td>
+                        <td style="padding:8px 6px; text-align:center;">
+                            <form method="POST" action="/remove/{{ fname|urlencode }}" style="display:inline; margin:0;" onsubmit="return removeFile(this, '{{ fname|urlencode }}');">
+                                <button type="submit" class="remove-btn">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% else %}
+            <p style="color:#888;">No videos downloaded yet.</p>
+            {% endif %}
+        </div>
+    </div>
+    <footer>
+        <div class="footer-brand">
+            <span>&copy; 2025 <span class="footer-brand-name">MYMSNGROUP</span> &mdash; Empowering Your Downloads</span>
+        </div>
+    </footer>
+    <script>
+        // Restore log content from localStorage on page load
+        window.onload = function() {
+            const savedLog = localStorage.getItem('statusLog');
+            if (savedLog) {
+                document.getElementById('log-content').innerHTML = savedLog;
+                localStorage.removeItem('statusLog');
+            }
+            const savedScroll = localStorage.getItem('statusScroll');
+            if (savedScroll) {
+                document.querySelector('.status-window').scrollTop = parseInt(savedScroll, 10);
+                localStorage.removeItem('statusScroll');
+            }
+        };
+
+        const form = document.getElementById('download-form');
+        const logContent = document.getElementById('log-content');
+        let eventSource = null;
+
+        form.onsubmit = function(e) {
+            e.preventDefault();
+            const url = document.getElementById('video-url').value;
+            if (!url) return;  // Don't proceed if URL is empty
+            
+            logContent.innerHTML = '';
+            if (eventSource) {
+                eventSource.close();
+            }
+            // Reset and show progress bar
+            const progressBar = document.getElementById('progress-bar');
+            progressBar.value = 0;
+            progressBar.style.display = 'block';
+            // Clear the URL field after getting its value
+            document.getElementById('video-url').value = '';
+            
+            // Start the download process
+            eventSource = new EventSource(`/stream?url=${encodeURIComponent(url)}`);
+            eventSource.onmessage = function(event) {
+                logContent.innerHTML += event.data + '<br>';
+                setTimeout(() => {
+                    const statusWindow = document.querySelector('.status-window');
+                    statusWindow.scrollTop = statusWindow.scrollHeight;
+                }, 0);
+                localStorage.setItem('statusLog', logContent.innerHTML);
+            };
+            eventSource.onerror = function() {
+                eventSource.close();
+                // Hide progress bar on error or completion
+                const progressBar = document.getElementById('progress-bar');
+                progressBar.value = 0;
+                progressBar.style.display = 'none';
+                // Save log and scroll position to localStorage before reload
+                const statusWindow = document.querySelector('.status-window');
+                localStorage.setItem('statusLog', logContent.innerHTML);
+                localStorage.setItem('statusScroll', statusWindow.scrollTop);
+                // Add a small delay before reload to ensure localStorage is saved
+                setTimeout(() => {
+                    location.reload(); // Reload page to update Downloaded Videos
+                }, 100);
+            };
+            // Listen for custom progress events
+            eventSource.addEventListener('progress', function(event) {
+                const percent = parseFloat(event.data);
+                const progressBar = document.getElementById('progress-bar');
+                progressBar.value = percent;
+                progressBar.style.display = 'block';
+                if (percent >= 100) {
+                    setTimeout(() => {
+                        progressBar.style.display = 'none';
+                    }, 1500);
+                }
+            });
+        };
+
+        function removeFile(form, filename) {
+            fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams(new FormData(form))
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Remove the row from the table
+                    const row = form.closest('tr');
+                    row.remove();
+                    
+                    // If no files left, show the "No videos" message
+                    const tbody = document.querySelector('tbody');
+                    if (tbody && tbody.children.length === 0) {
+                        const table = document.querySelector('table');
+                        if (table) {
+                            table.parentElement.innerHTML = '<p style="color:#888;">No videos downloaded yet.</p>';
+                        }
+                    }
+                }
+            })
+            .catch(error => console.error('Error:', error));
+            
+            return false; // Prevent form submission
+        }
+    </script>
+</body>
+</html> 

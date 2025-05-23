@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Suspicious Activity Detected</title>
+    <style>
+        body {
+            background: #f8fafc;
+            font-family: 'Inter', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .error-container {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            padding: 40px 32px;
+            text-align: center;
+        }
+        h1 {
+            color: #dc2626;
+            font-size: 2.5em;
+            margin-bottom: 0.2em;
+        }
+        p {
+            color: #555;
+            font-size: 1.2em;
+            margin-bottom: 0.5em;
+        }
+        .rate-info {
+            color: #888;
+            font-size: 1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1>Warning: Suspicious Activity Detected</h1>
+        <p>Our system has detected a high number of requests from your IP address in a short period of time.</p>
+        <div class="rate-info">
+            Possible brute force or automated behavior detected.<br>
+            Limit: 5 requests per 30 seconds.
+        </div>
+        <p>If you believe this is a mistake, please wait a moment and try again.<br>
+        Continued excessive requests may result in a temporary block.</p>
+    </div>
+</body>
+</html> 
